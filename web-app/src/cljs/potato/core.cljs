@@ -1308,7 +1308,7 @@ highlighted-message - the message that should be highlighted (or
                                 (if (= (:special item) "emoji") (potato.emoji/span item) (:text item))))
                             found-items))
                      [(om.dom/div #js {:className "notice"} "no match")]))))))))
-
+;; 对话输入部分
 (defn channel-input [channel owner]
   (reify
     om/IDisplayName (display-name [_] "channel-input")
@@ -1318,6 +1318,7 @@ highlighted-message - the message that should be highlighted (or
        :typing         #{}})
     om/IWillUnmount
     (will-unmount [_]
+      ;; umount的时候从异步消息上取消监听
       (async/unsub (:event-publisher (om/get-shared owner)) :type (om/get-state owner :typing-channel)))
     om/IDidMount
     (did-mount [this]
@@ -1399,7 +1400,7 @@ highlighted-message - the message that should be highlighted (or
                                           (list (om.dom/img #js {:src image-url} "Image")))
                                         (om.dom/button nil (or (:button-text e) "Select"))))))
                             (:options options)))))))))
-
+;; 对话窗口部分的
 (defn channel-view [channel owner opts]
   (reify
       om/IDisplayName (display-name [_] "channel-view")
