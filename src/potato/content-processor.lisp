@@ -5,8 +5,14 @@
 (defvar *url-content-processors* nil)
 
 (defun register-url-processor (handler url-regexps)
+;; register url processor with handler 
   (check-type handler symbol)
+  ;; make suere the handler is a symbol
   (let ((removed (remove handler *url-content-processors* :key #'cdr)))
+    ;; remove the handler from *url-content-processors* 
+    ;; the map of *url-content-processors*  is (url,handler)
+    ;; remove is a function of Common Lisp 
+    ;; removed contains all items without handler
     (setf *url-content-processors*
           (append (mapcar (lambda (v)
                             (cons (cl-ppcre:create-scanner v) handler))
@@ -28,6 +34,7 @@
       (search-fields parsed))))
 
 (defun process-update (msg)
+  ;; process msg
   (let* ((content (st-json:read-json-from-string (babel:octets-to-string (cl-rabbit:message/body (cl-rabbit:envelope/message msg)) :encoding :utf-8)))
          (text (st-json:getjso "text" content))
          (urls (find-urls-in-content text)))

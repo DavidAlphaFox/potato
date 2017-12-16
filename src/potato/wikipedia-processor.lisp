@@ -6,6 +6,7 @@
 (declaim #.potato.common::*compile-decl*)
 
 (defun find-wikipedia-summary (keyword)
+  ;; load data from wikipedia with return result of json 
   (multiple-value-bind (body code headers orig-url stream should-close reason)
       (drakma:http-request (format nil "https://en.wikipedia.org/w/api.php?action=query&titles=~a&prop=extracts&exintro=&explaintext=&exsentences=1&format=json" keyword)
                            :want-stream t)
@@ -28,6 +29,7 @@
 
 (defun format-wikipedia-summary (result)
   (destructuring-bind (title extract) result
+    ;; format wikipeda summary
     (babel:octets-to-string
      (flexi-streams:with-output-to-sequence (s)
        (lofn:show-template s "wikipedia-data.tmpl" `((:title . ,title)

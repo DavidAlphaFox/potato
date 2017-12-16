@@ -39,7 +39,7 @@ are correct.")
 
 (defun generate-random-login-reference ()
   (ironclad:byte-array-to-hex-string (secure-random:bytes 64 secure-random:*generator*)))
-
+;; 
 (defun show-login-screen (username error-p redirect)
   (lofn:with-parameters ((mobile "m"))
     (lofn:show-template-stream "login.tmpl" (list (cons :username username)
