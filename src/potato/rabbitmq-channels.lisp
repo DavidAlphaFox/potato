@@ -9,7 +9,7 @@
 ;;;
 ;;;  Command is one of: user-name-update, channel-change, update-star
 ;;;
-
+;; 处理channel中的消息
 (defun process-channel-update (msg)
   (let* ((body (cl-rabbit:message/body (cl-rabbit:envelope/message msg)))
          (content (binary-to-lisp body)))

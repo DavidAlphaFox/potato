@@ -4,7 +4,7 @@
 
 (defvar *max-message-size* 10000
   "The maximum number of characters in a single message that is posted from a user.")
-
+;; 对channel进行定义
 (defclass channel ()
   ((name     :type string
              :initarg :name
