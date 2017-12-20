@@ -21,6 +21,7 @@
 
 (defun find-urls-in-content (text)
   (let ((parsed (markup-message-content text)))
+    ;; parsed markup
     (labels ((search-fields (fields)
                (loop
                   for entry in fields
@@ -38,14 +39,17 @@
   (let* ((content (st-json:read-json-from-string (babel:octets-to-string (cl-rabbit:message/body (cl-rabbit:envelope/message msg)) :encoding :utf-8)))
          (text (st-json:getjso "text" content))
          (urls (find-urls-in-content text)))
+    ;; get urls in content
     (loop
        for url in urls
        do (loop
              for handler in *url-content-processors*
+             ;; loop to find the handler of url
              do (multiple-value-bind (match strings)
                     (cl-ppcre::scan-to-strings (car handler) url)
                   (when match
                     (funcall (cdr handler) strings content
+                    ;; call processor with callback
                              (lambda (text)
                                (with-pooled-rabbitmq-connection (conn)
                                  (let ((message-id (st-json:getjso "id" content))

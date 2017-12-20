@@ -82,6 +82,7 @@ following form: DOMAIN.CHANNEL.USER.COMMAND")
   "Queue that is bound to unrouted commands from *SLASHCOMMAND-REQUEST-EXCHANGE-NAME*")
 
 (defun connect-to-rabbitmq ()
+  ;; connect to rabbit
   (handler-bind ((error (lambda (condition)
                           (log:error "Error when connection to rabbitmq: ~a" condition))))
     (let* ((conn (cl-rabbit:new-connection))
@@ -94,6 +95,7 @@ following form: DOMAIN.CHANNEL.USER.COMMAND")
   (cl-rabbit:destroy-connection conn))
 
 (defun make-rabbitmq-connection-pool (&key (capacity 5))
+  ;; create connection pool of rabbitmq
   (pooler:make-pool :name "RabbitMQ connection pool"
                     :capacity capacity
                     :item-maker #'connect-to-rabbitmq
