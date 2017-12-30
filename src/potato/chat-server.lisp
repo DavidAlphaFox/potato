@@ -89,7 +89,9 @@
 (potato.common.application:define-component main-web-server
   (:dependencies potato.common::generic potato.db::db potato.upload::upload)
   (:start
+    ;; 创建状态处理线程
    (start-state-listener-thread)
+   ;; 启动web
    (start-web)
    (potato.message-update:start-message-update-thread)
    (log:info "Server started")))

@@ -96,7 +96,7 @@
       (potato.db:save-instance group)
       (mapc #'flush-cached-group-channel-tree uids)
       group)))
-
+;; 将用户加入到群组中
 (defgeneric add-user-to-group (group user role)
   (:method ((group string) user role)
     (add-user-to-group (potato.db:load-instance 'group group) user role))

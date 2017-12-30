@@ -48,12 +48,15 @@
       (when (and (equal text "")
                  (null extra-html))
         (raise-message-update-failed "Both text and extra-html are blank"))
+      ;; 将消息发送给Channel  
       (potato.workflow:send-message-to-channel sender channel text :extra-html extra-html :send-update nil))))
 
 (defun dispatch-message-command (command)
   (handler-case
       (case (car command)
+        ;;  处理更新消息
         (:update (handle-message-update-request (cadr command)))
+        ;; 处理投递消息
         (:post (handle-message-post-request (cadr command)))
         (t
          (raise-message-update-failed "Unexpected command: ~s" command)))
@@ -62,6 +65,7 @@
 
 (defun message-update-main-loop ()
   (with-rabbitmq-connected (conn)
+    ;; 直接消费chat-image-queue
     (cl-rabbit:basic-consume conn 1 *chat-image-converter-response-queue-name* :no-ack t)
     (loop
        for msg = (cl-rabbit:consume-message conn)

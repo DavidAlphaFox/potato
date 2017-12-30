@@ -65,25 +65,31 @@
         (funcall callback)))))
 
 (defun dispatch-channel-changes-message (msg)
+  ;; 处理消息
   (let ((req (binary-to-lisp (cl-rabbit:message/body (cl-rabbit:envelope/message msg)))))
     (log:trace "State server message: ~s" req)
     (string-case:string-case ((car req))
       (#.*state-server-reply-user-add-to-channel*
        (destructuring-bind (channel-id user-id) (cdr req)
+        ;; 用户加入
          (notify-user-join-remove :add channel-id user-id)))
 
       (#.*state-server-reply-user-remove-from-channel*
        (destructuring-bind (channel-id user-id) (cdr req)
+       ;; 用户离开
          (notify-user-join-remove :remove channel-id user-id)))
 
       (#.*state-server-reply-sync-users*
        (destructuring-bind (channel-id users) (cdr req)
+       ;; 用户同步
          (process-sync-users channel-id users)))
 
       (t nil))))
 
 (defun state-listener ()
   (with-rabbitmq-connected (conn)
+    ;; 建立一个进程来监听RabbitMQ下的state-server-sender-ex这个交换机
+    ;; 随机产生一个队列名字并绑定到state-server-sender-ex交换机下，接收所有的消息
     (let ((queue-name (cl-rabbit:queue-declare conn 1 :auto-delete t :durable nil :exclusive nil)))
       #+nil(cl-rabbit:queue-bind conn 1 :queue queue-name :exchange *state-server-sender-exchange-name* :routing-key "#")
       (cl-rabbit:basic-consume conn 1 queue-name :no-ack t)
