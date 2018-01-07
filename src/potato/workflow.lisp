@@ -162,10 +162,10 @@ it's eliminated altogether."
   (check-type user user)
   (check-type channel channel)
   (log:trace "Sending message from user: ~s on channel: ~s, text: ~s" user channel text)
-  (let* ((text (ensure-printable-string text))
-         (processed-text (update-username-references-in-text text))
+  (let* ((text (ensure-printable-string text)) ;; 进行初步的消息转化，确保消息都是可以识别的
+         (processed-text (update-username-references-in-text text)) ;; 更新消息中关于@用户的部分
          (message (potato.core:make-message channel user processed-text :extra-html extra-html))
-         (result (potato.core:save-message message)))
+         (result (potato.core:save-message message))) ;; 保存信息和额外的html
     (when send-typing-end
       (potato.core:send-typing-end-notification-to-state-server channel user))
     (when send-update

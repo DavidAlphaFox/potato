@@ -137,6 +137,7 @@
 (defmethod hunchensocket:text-message-received ((conn ws-connection) user message)
   (log:trace "got ws message: ~a, conn: ~s" message conn)
   (with-accessors ((refresh ws-connection/last-web-session-refresh-time)) conn
+  ;; 读取json信息
     (let ((data (st-json:read-json-from-string message)))
       (string-case:string-case ((st-json:getjso "cmd" data))
         ("refresh"
@@ -162,6 +163,7 @@
       (lofn:with-checked-parameters ((http-event :name "event" :required nil)
                                      (sid :name "session_id" :required nil))
         (potato.core:with-authenticated-user ()
+          ;; 加载channel，创建conn
           (let ((channel (potato.core:load-channel-with-check cid)))
             (let ((conn (make-instance 'ws-connection
                                        :channel channel

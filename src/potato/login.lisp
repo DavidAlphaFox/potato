@@ -110,6 +110,7 @@ credentials. This function returns the current session."
         nil)))
 
 (defmacro with-authenticated-user ((&optional allow-unregistered) &body body)
+  ;; 生成两个symbols
   (alexandria:with-gensyms (user-session-sym user-sym)
     ;; We bind *CURRENT-USER-SESSION* to itself in order to ensure a
     ;; local binding for this variable. However, it would be nicer if

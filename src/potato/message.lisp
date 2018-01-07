@@ -236,6 +236,7 @@
                                 (error "Unable to save message after ~a attempts" *max-save-attempts*))
                               (return doc)))))
         (setf (message/id m) (getfield :|id| doc))
+        ;; 当消息保存成功后，给RabbitMQ发送message-update消息
         (send-message-update-to-rabbitmq-queue m)
         ;; Handle the post-submission processing in the background.
         ;; There is no need to let the client wait for this to

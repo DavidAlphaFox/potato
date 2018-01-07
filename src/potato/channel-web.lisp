@@ -82,18 +82,22 @@
 
 (defun try-send-channel (data text)
   (json-bind ((cid "channel")) data
+    ;; 核心是workflow
+    ;; 使用workflow进行消息发送
     (potato.workflow:send-message-to-channel (potato.core:current-user)
                                              (potato.core:load-channel-with-check cid)
                                              text)))
-
+;; 客户端发送消息
 (potato.core:define-json-handler-fn-login (send-chat-screen "/send_chat" data nil ())
   (potato.core:with-authenticated-user ()
     (let* ((text (string-trim +BLANK-CHARS+ (st-json:getjso "text" data)))
            (length (length text)))
+      ;; 确保消息长度不超长     
       (cond ((> length potato.core:*max-message-size*)
              (st-json:jso "result" "error"
                           "message" "Message too large"))
             ((plusp length)
+             ;; 尝试发送消息
              (alexandria:if-let ((result (try-send-channel data text)))
                ;; Successfully saved the message
                (st-json:jso "result" "ok"

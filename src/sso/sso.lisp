@@ -6,7 +6,7 @@
 (defvar *ldap-user* "demo")
 (defvar *ldap-password* "demo")
 (defvar *ldap-base* "dc=company,dc=com")
-
+;; 定义LDAP用户信息
 (defclass ldap-user ()
   ((name        :type string
                 :initarg :name
@@ -35,7 +35,7 @@
                  :base *ldap-base*
                  :user user
                  :pass password))
-
+;; 使用保护机制去连接LDAP,防止不释放LDAP连接
 (defmacro with-connect-ldap ((ldap-sym) &body body)
   (let ((sym (gensym)))
     `(let ((,sym (connect-ldap *ldap-user* *ldap-password*)))
