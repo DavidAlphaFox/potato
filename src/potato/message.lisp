@@ -198,7 +198,7 @@
                                        (:|name| . ,(second v))
                                        (:|size| . ,(third v))))
                        files))
-
+            ;; 尝试保存到CouchDB中
              (attempt-save (index)
                (handler-case
                    (let ((image (message/image m))

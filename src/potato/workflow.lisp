@@ -155,7 +155,7 @@ it's eliminated altogether."
                   (write-string text s :start start)
                   (setq start length)))))))
 
-
+;; 将用户的消息广播的到当前的channel中
 (defun send-message-to-channel (user channel text
                                 &key extra-html (send-typing-end t) (send-update t))
   "Send a message from USER to CHANNEL with content TEXT. Returns the message instance."

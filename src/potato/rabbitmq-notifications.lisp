@@ -90,7 +90,7 @@
     (print-queue-name-prefix s uid cid-list)
     (princ "-" s)
     (princ (make-random-name 20) s)))
-
+;; 添加新Channel邦定
 (define-async-sync-function add-new-channel-binding add-new-channel-binding-async
     ((d declare-notifications-queue declare-notifications-queue-async)
      (r request-full-state-server-sync request-full-state-server-sync-async)

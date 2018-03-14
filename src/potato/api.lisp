@@ -339,7 +339,7 @@ to initialise a session."
                                                               (if num (min (parse-integer num) 1000) 10)
                                                               (if (or (null from) (equal from "now")) nil from))))
                   (st-json:jso "messages" (mapcar (lambda (v) (funcall translate-function v)) messages)))))))))
-
+;; 创建新的消息
 (define-api-method (api-message-screen "/channel/([a-z0-9]+)/create" t (channel-id))
   (api-case-method
     (:post
@@ -383,7 +383,7 @@ to initialise a session."
                                                               uploaded-file)))
          (st-json:jso "result" "ok"
                       "id" (potato.core:message/id message)))))))
-
+;; 正在输入的状态
 (define-api-method (api-type-screen "/channel/([a-z0-9]+)/type" t (cid))
   (api-case-method
     (:post (let ((channel (potato.core:load-channel-with-check cid)))
