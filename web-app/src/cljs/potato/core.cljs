@@ -452,6 +452,9 @@ id's. Returns the updated value."
     (om/transact! (state-root) [:channels cid :options]
       (fn [_] e))))
 
+(defn- handle-unknown-slashcommand [e]
+  (cljs.pprint/cl-format true "Should display error message here. Unknown command: ~a" (:cmd e)))
+
 (defn dispatch-notification-entry [entry async-channel]
   (cljs.pprint/cl-format true "Got server message: ~s" entry)
   (case (:type entry)
@@ -488,6 +491,9 @@ id's. Returns the updated value."
     ;; Interactive options
     "option"
     (handle-interactive-option entry)
+    ;; Unknown slashcommand
+    "unknown-slashcommand"
+    (handle-unknown-slashcommand entry)
     ;; Log any unhandled event types
     (cljs.pprint/cl-format true "Unknown type: ~s" entry)))
 
@@ -609,7 +615,7 @@ id's. Returns the updated value."
             (om.dom/a {:href "#"} ""))))))
 
 (defn display-time [time]
-  (om.dom/time #js {:dateTime time} (.fromNow (js/moment time))))
+  (om.dom/time #js {:dateTime time :title (-> (js/moment time) (.format "LLLL"))} (.fromNow (js/moment time))))
 
 ;;; ISeqable for NodeList from https://groups.google.com/forum/#!topic/clojure/unHrE3amqNs
 (extend-type js/NodeList
@@ -677,10 +683,10 @@ id's. Returns the updated value."
     (render [_]
       (apply om.dom/menu #js {:id "chat-popup-menu" :type "popup"}
              (map (fn [menuentry]
-                    (om.dom/menuitem #js {:label        (:label menuentry)
-                                          :onClick      (:onclick menuentry)
-                                          :onMouseEnter #(goog.dom.classlist/add    (.-currentTarget %) "chat-popup-item-active")
-                                          :onMouseLeave #(goog.dom.classlist/remove (.-currentTarget %) "chat-popup-item-active")}
+                    (om.dom/div #js {:label        (:label menuentry)
+                                     :onClick      (:onclick menuentry)
+                                     :onMouseEnter #(goog.dom.classlist/add    (.-currentTarget %) "chat-popup-item-active")
+                                     :onMouseLeave #(goog.dom.classlist/remove (.-currentTarget %) "chat-popup-item-active")}
                       (:label menuentry)))
                   (concat [{:label "Hide" :onclick #(toggle-hidden message)}]
                           (if (:can-edit-p opts)
@@ -1300,11 +1306,11 @@ highlighted-message - the message that should be highlighted (or
                    (if (> (count found-items) 0)
                      (let [selected (or (get-selected-entry) (select-default-entry))]
                        (map (fn [item]
-                              (om.dom/menuitem #js {:className    (if (= (:id item) (:id selected)) "active")
-                                                    :onMouseEnter #(select-entry item)
-                                                    :onClick      #(potato.keyboard/key-on-default
-                                                                    (om/get-shared owner :keyboard-control)
-                                                                    potato.keyboard/ENTER)}
+                              (om.dom/div #js {:className    (if (= (:id item) (:id selected)) "active")
+                                               :onMouseEnter #(select-entry item)
+                                               :onClick      #(potato.keyboard/key-on-default
+                                                               (om/get-shared owner :keyboard-control)
+                                                               potato.keyboard/ENTER)}
                                 (if (= (:special item) "emoji") (potato.emoji/span item) (:text item))))
                             found-items))
                      [(om.dom/div #js {:className "notice"} "no match")]))))))))

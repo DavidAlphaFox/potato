@@ -25,7 +25,7 @@
                               :password (or password "")
                               :activated-p nil
                               :activate-code (ironclad:byte-array-to-hex-string (secure-random:bytes 16 secure-random:*generator*))
-                              :default-image-name (format nil "~a.png" (1+ (random 7))))))
+                              :default-image-name (format nil "~a.png" (1+ (secure-random:number 7))))))
     (when password
       (potato.core::user/update-password user password))
     user))
@@ -77,7 +77,7 @@
       ;; If errors, send back to the registration page
       (if errors
           (show-register-template errors)
-          (register-user-and-redirect email description password1 mobile-p
+          (register-user-and-redirect email-trimmed description password1 mobile-p
                                       (if mobile-p "potato://sent-registration"))))))
 
 (lofn:define-handler-fn (register-screen "/register" nil ())
@@ -102,9 +102,9 @@
 
   (let ((url (potato.core:make-potato-url "activate?user=~a&id=~a"
                                           (encode-name (user/id user)) (user/activate-code user))))
-    (unless *smtp-server-host*
+    (unless *email-type*
       (unless *inhibit-no-smtp-server-warning*
-        (log:warn "No SMTP server specified. Registration email will not be sent. Manual registration URL: ~a" url))
+        (log:warn "No email sender configured. Registration email will not be sent. Manual registration URL: ~a" url))
       (return-from send-activation-email))
     (potato.email:send-email (make-instance 'potato.email:mail-descriptor
                                             :to-name (user/description user)
@@ -138,3 +138,8 @@
       (unless (user/activated-p user)
         (send-activation-email user))
       (lofn:show-template-stream "activation_email_sent.tmpl" `((:user-activated-p . ,(user/activated-p user)))))))
+
+(define-handler-fn-login (user-not-activated-screen "/user_not_activated" nil ())
+  (with-authenticated-user (t)
+    (let ((user (current-user)))
+      (lofn:show-template-stream "user_not_activated.tmpl" `((:user-activated-p . ,(user/activated-p user)))))))

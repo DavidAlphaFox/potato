@@ -3,6 +3,7 @@
 (declaim #.potato.common::*compile-decl*)
 
 (defvar *gcm-authorisation-key* nil)
+(defvar *gcm-sender* nil)
 
 (deftype provider-type () '(member :gcm :apns :apns-dev))
 
@@ -106,7 +107,7 @@
              ;; it could never actually have been called. I think this
              ;; is a leftover from older code where there could only
              ;; be a single GCM registration per user. Before
-             ;; compltely removing it, I'm keeping this comment here
+             ;; completely removing it, I'm keeping this comment here
              ;; until it can be proven that this will never be called.
              #+broken
              (progn
@@ -140,7 +141,8 @@
 (defun update-unread-subscription (user token provider channel add-p)
   (let ((cid (potato.core:ensure-channel-id channel))
         (reg (potato.db:load-instance 'gcm-registration
-                                      (make-gcm-registration-key (potato.core:ensure-user-id user) token provider))))
+                                      (make-gcm-registration-key (potato.core:ensure-user-id user) token provider)
+                                      :error-if-not-found nil)))
     (unless reg
       (potato.core:raise-not-found-error "Incorrect GCM registration"))
     (if add-p
@@ -185,7 +187,7 @@
                               "data" data)))
     (log:debug "Content = ~s" content)
     (multiple-value-bind (body code headers orig-url stream should-close reason)
-        (drakma:http-request "https://gcm-http.googleapis.com/gcm/send"
+        (drakma:http-request "https://fcm.googleapis.com/fcm/send"
                              :method :post
                              :content-type "application/json"
                              :additional-headers `((:authorization . ,(concatenate 'string "key=" *gcm-authorisation-key*)))

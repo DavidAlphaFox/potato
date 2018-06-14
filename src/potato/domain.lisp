@@ -125,12 +125,11 @@
        for row in (getfield :|rows| result)
        collect (potato.db:load-instance-from-doc 'domain-email-invitation (getfield :|value| row)))))
 
-(defun find-domain-email-invitations-for-user (user)
-  (let* ((user (ensure-user user))
-         (invitations (loop
-                         for email in (user/email-addresses user)
-                         for v = (find-domain-email-invitations-for-email email)
-                         append v)))
+(defun find-domain-email-invitations-for-email-addresses (emails)
+  (let ((invitations (loop
+                       for email in emails
+                       for v = (find-domain-email-invitations-for-email email)
+                       append v)))
     (remove-duplicates invitations :test #'equal :key #'domain-email-invitation/domain)))
 
 (defun find-domain-email-invitations-for-domain (domain)
@@ -180,21 +179,25 @@
 (defun find-public-domains ()
   (potato.db:invoke-view-and-load-instances 'domain "domain" "public_domains"))
 
-(defgeneric load-available-domains (user)
+(defun load-available-domains-for-emails (emails)
+  (let ((domains (append (find-public-domains)
+                         (find-domains-for-email-addresses emails)
+                         (mapcar (lambda (v)
+                                   (potato.db:load-instance 'domain (domain-email-invitation/domain v)))
+                                 (find-domain-email-invitations-for-email-addresses emails)))))
+    (remove-duplicates domains :key #'domain/id :test #'equal)))
+
+(defgeneric load-available-domains-for-user (user)
   (:method ((user string))
-    (load-available-domains (load-user user)))
+    (load-available-domains-for-user (load-user user)))
   (:method ((user user))
-    (let ((domains (append (find-public-domains)
-                           (find-domains-for-email-addresses (user/email-addresses user))
-                           (mapcar #'(lambda (v)
-                                       (potato.db:load-instance 'domain (domain-email-invitation/domain v)))
-                                   (find-domain-email-invitations-for-user user)))))
-      (remove-duplicates domains :key #'domain/id :test #'equal))))
+    (load-available-domains-for-emails (user/email-addresses user))))
 
 (defun remove-user-from-domain (domain user)
   (let* ((user (ensure-user user))
          (domain (ensure-domain domain))
-         (domain-id (domain/id domain)))
+         (domain-id (domain/id domain))
+         (domain-user (potato.db:load-instance 'domain-user (make-user-domain-mapping-id (user/id user) domain-id))))
     ;; Remove the user from the domain's groups
     (let* ((groups-for-domain (find-groups-in-domain domain))
            (groups-for-user-domain (remove-if-not (lambda (group)
@@ -210,8 +213,18 @@
       (dolist (ch channels-for-user-domain)
         (remove-user-from-channel ch user)))
     ;; Remove the user from the domain
-    (let ((key (make-user-domain-mapping-id (user/id user) domain-id)))
-      (clouchdb:delete-document key))))
+    (potato.db:remove-instance domain-user)))
+
+(defun update-user-role-in-domain (domain user role)
+  (let* ((user (ensure-user user))
+         (domain (ensure-domain domain))
+         (domain-user (potato.db:load-instance 'domain-user
+                                              (make-user-domain-mapping-id (user/id user) (domain/id domain)))))
+    (unless (and (eq (domain/domain-type domain) :corporate)
+                 (member role '(:user :admin)))
+      (error "Illegal user role: ~s for given domain" role))
+    (setf (domain-user/role domain-user) role)
+    (potato.db:save-instance domain-user)))
 
 (defun find-channels-in-domain (domain)
   (potato.db:invoke-view-and-load-instances 'potato.core:channel "channel" "channels_in_domain"

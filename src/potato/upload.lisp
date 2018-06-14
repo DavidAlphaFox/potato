@@ -210,15 +210,16 @@
               (send-file-upload-message-to-channel file)
               (st-json:write-json-to-string (st-json:jso "file" (file/name file))))))))))
 
-(defun create-file-s3 (user channel filename mime-type input-file)
+(defun create-file-s3 (user channel filename mime-type input-file subdirectory)
   (let ((user (potato.core:ensure-user user))
         (channel (potato.core:ensure-channel channel)))
     (multiple-value-bind (match strings)
         (cl-ppcre:scan-to-strings ".+(\\.[^.]+)$" filename)
       (let* ((cid (potato.core:channel/id channel))
-             (key (format nil "~a/~a/~a~a"
-                          (potato.core:channel/domain channel)
+             (key (format nil "~a/~a/~@[~a/~]~a~a"
+                          *s3-directory*
                           cid
+                          subdirectory
                           (make-random-name 40)
                           (if match (aref strings 0) "")))
              (file (make-instance 'file
@@ -256,14 +257,21 @@ Parameters"
        else
        do (format s "%~16,2,'0r" ch))))
 
+(defun find-vhost ()
+  "Find the :VHOST parameter for the given endpoint.
+This is a bit hackish, and is only needed because ZS3 has some hardcoded
+values for Amazon."
+  (if (s3-wasabi-enabled)
+      :wasabi
+      :amazon))
+
 (defun download-s3 (file)
   (check-s3-active)
   (let ((url (zs3-authorized-url :bucket *s3-bucket*
                                  :key (file/key file)
                                  :expires (+ (get-universal-time) 60)
                                  :vhost :amazon
-                                 :content-disposition (format nil "inline; filename*=~a"
-                                                              (encode-rfc5987 (file/name file)))
+                                 :content-disposition (format nil "inline; filename*=~a" (encode-rfc5987 (file/name file)))
                                  :content-type (or (file/mime-type file) "binary/octet-stream")
                                  :ssl t)))
     (log:trace "Redirecting download to URL: ~a" url)

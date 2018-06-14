@@ -59,9 +59,11 @@
             (raise-api-error "Not logged in" hunchentoot:+http-forbidden+))
           user))))
 
-(defun verify-api-token-and-run (url fn)
+(defun verify-api-token-and-run (url auth-p fn)
   (handler-case
-      (let ((potato.core::*current-auth-user* (load-user-from-api-token-or-session)))
+      (let ((potato.core::*current-auth-user* (if auth-p
+                                                  (load-user-from-api-token-or-session)
+                                                  nil)))
         (funcall fn))
     ;; Error handlers
     (api-error (condition)
@@ -78,12 +80,14 @@
                    "error_type" "permission"
                    "message" (potato.core:potato-error/message condition)))))
 
-(lofn:define-handler-fn (login-api-key-screesn "/login_api_key" nil ())
+(lofn:define-handler-fn (login-api-key-screen "/login_api_key" nil ())
   (lofn:with-parameters ((key "api-key")
                          (redirect "redirect"))
     (let ((user (load-user-from-api-token key)))
       (potato.core::update-user-session user)
       (hunchentoot:redirect (or redirect "/")))))
+
+
 
 (defmacro api-case-method (&body cases)
   (destructuring-bind (new-cases has-default-p)
@@ -106,19 +110,20 @@
                                                         (symbol-name ,method-sym))
                                                 hunchentoot:+http-method-not-allowed+)))))))))
 
-(defmacro define-api-method ((name url regexp (&rest bind-vars) &key (result-as-json t)) &body body)
+(defmacro define-api-method ((name url regexp (&rest bind-vars)
+                              &key (result-as-json t) (auth-p t)) &body body)
   (let ((result-sym (gensym "RESULT-")))
     `(lofn:define-handler-fn (,name ,(concatenate 'string +api-url-prefix+ url) ,regexp ,bind-vars)
        (log:trace "Call to API method ~s, URL: ~s" ',name (hunchentoot:request-uri*))
        ,(if result-as-json
-            `(let ((,result-sym (verify-api-token-and-run ',name (lambda () ,@body))))
+            `(let ((,result-sym (verify-api-token-and-run ',name ,auth-p (lambda () ,@body))))
                (lofn:with-hunchentoot-stream (out "application/json")
                  (st-json:write-json ,result-sym out)
                  ;; Write a final newline to make the output a bit easier to
                  ;; read when using tools such as curl
                  (format out "~c" #\Newline)))
             ;; ELSE: Don't process the result
-            `(verify-api-token-and-run ',name (lambda () ,@body))))))
+            `(verify-api-token-and-run ',name ,auth-p (lambda () ,@body))))))
 
 (defun api-load-channels-for-group (group)
   (let ((is-private-p (eq (potato.core:group/type group) :private)))
@@ -161,9 +166,14 @@
          (if include-channels-p
              (list "channels" (api-load-channels-for-group group)))))
 
-(define-api-method (api-version-screen "/version" nil ())
+(define-api-method (api-version-screen "/version" nil () :auth-p nil)
   (api-case-method
     (:get (st-json:jso "version" "1"))))
+
+(define-api-method (api-server-info-screen "/server" nil () :auth-p nil)
+  (api-case-method
+    (:get (st-json:jso "version" "1"
+                       "gcm_sender" (or potato.gcm:*gcm-sender* :null)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Session API calls
@@ -181,13 +191,13 @@ to initialise a session."
               "domains" (load-domain-and-channel-information-as-json user)
               "websocket_url" *external-websocket-listen-address*
               "upload_location" (ecase potato.upload:*default-upload-location*
-                                  (:s3 "s3)")
+                                  (:s3 "s3")
                                   (:file "file")
                                   ((nil) :null))
               (if (and *s3-browser-access-key* *s3-endpoint* *s3-bucket*)
-                  (st-json:jso "s3_credentials" (st-json:jso "access_key" *s3-browser-access-key*
-                                                             "endpoint" *s3-endpoint* *s3-bucket*
-                                                             "bucket" *s3-bucket*))))))))
+                  (list "s3_credentials" (st-json:jso "access_key" *s3-browser-access-key*
+                                                      "endpoint" *s3-endpoint*
+                                                      "bucket" *s3-bucket*))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Domain API calls
@@ -207,6 +217,48 @@ to initialise a session."
     (:get (lofn:with-checked-parameters ((include-groups :type :boolean)
                                          (include-channels :type :boolean))
             (api-load-domain-info domain-id include-groups include-channels)))))
+
+(define-api-method (api-domain-users-screen "/domains/([^/]+)/users" t (domain-id))
+  (let ((domain (potato.core:load-domain-with-check domain-id (potato.core:current-user) :require-admin-p t)))
+    (api-case-method
+      (:get (let* ((result (clouchdb:invoke-view "domain" "users_in_domain" :key (potato.core:domain/id domain))))
+              (mapcar (lambda (row)
+                        (let ((d (getfield :|value| row)))
+                          (st-json:jso "user" (getfield :|user| d)
+                                       "role" (getfield :|role| d))))
+                      (getfield :|rows| result)))))))
+
+(define-api-method (api-domain-user-modify-screen "/domains/([^/]+)/users/([^/]+)" t (domain-id uid))
+  (macrolet ((with-role-json ((role-sym) &body body)
+               (alexandria:with-gensyms (role)
+                 `(json-bind ((,role "role")) (parse-and-check-input-as-json)
+                    (unless (eq (potato.core:domain/domain-type domain) :corporate)
+                      (raise-api-error "Invalid domain type"
+                                       hunchentoot:+http-bad-request+))
+                    (let ((,role-sym (string-case:string-case (,role)
+                                       ("USER" :user)
+                                       ("ADMIN" :admin)
+                                       (t (raise-api-error "Illegal role" hunchentoot:+http-bad-request+)))))
+                      (progn ,@body))))))
+    (let* ((domain (potato.core:load-domain-with-check domain-id (potato.core:current-user) :require-admin-p t))
+           (user (potato.core:load-user uid)))
+      (api-case-method
+        (:get
+         (let ((role (potato.core:user-is-in-domain-p domain user)))
+           (if role
+               (st-json:jso "user" (potato.core:user/id user) "role" (symbol-name role))
+               (raise-api-error "User not found in domain" hunchentoot:+http-not-found+))))
+        (:post
+         (with-role-json (role-symbol)
+           (potato.workflow:add-user-to-domain user domain role-symbol)
+           (st-json:jso "result" "ok")))
+        (:put
+         (with-role-json (role-symbol)
+           (potato.core:update-user-role-in-domain domain user role-symbol)
+           (st-json:jso "result" "ok")))
+        (:delete
+         (potato.core:remove-user-from-domain domain user)
+         (st-json:jso "result" "ok"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Group API calls

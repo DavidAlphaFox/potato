@@ -175,15 +175,30 @@
      (nickname "The nickname to be associated with the domain, or the empty string to remove the nickname"))
     ()
     "Set the nickname for a domain"
-    "Sets the nickname for the given domain. If the domain already had a nickname, the old one will become available for a different domain."
+    "Sets the nickname for the given domain. If the domain already had
+a nickname, the old one will become available for a different domain."
   (potato.core:set-nickname-for-domain domain (if (equal nickname "") nil nickname)))
+
+(define-command update-domain-join-default "update-domain-join-default"
+    ((domain "The id of the domain")
+     (join-default "A boolean indicating the join-default state"))
+    ()
+    "Update the join-default value for a domain"
+    "Updates the join-default value for a given domain. If true, then
+any user who registers and has access to the domain will be
+automatically joined when their user is created."
+  (let ((domain (potato.db:load-instance 'potato.core:domain domain)))
+    (setf (potato.core:domain/join-default domain) (arg-is-active join-default))
+    (potato.db:save-instance domain)))
 
 (define-command set-domain-admin "set-domain-admin"
     ((domain "The id of the domain")
      (user "The user id of the user that should be set as admin"))
     ()
     "Gives admin rights to a domain"
-    "The given user is desigated as an administator of the given domain. This command will only work for users that are already members of the domain."
+    "The given user is desigated as an administator of the given
+domain. This command will only work for users that are already members
+of the domain."
   (let ((domain (potato.db:load-instance 'potato.core:domain domain))
         (user (potato.db:load-instance 'potato.core:user user)))
     (potato.core:update-domain-user-role domain user :admin))
@@ -235,8 +250,6 @@
 domain is anything that comes after the @ sign in an email
 address. Users with an email address that matches the registered
 addresses will be allowed to join this domain."
-  (unless (potato.core:is-allowed-email-p email)
-    (error "Illegal email format: ~s~%" email))
   (let ((d (potato.db:load-instance 'potato.core:domain domain)))
     (if (find email (potato.core:domain/email-domains d) :test #'string=)
         (format t "Email already added to domain~%")
@@ -392,6 +405,7 @@ Valid values for role is: user, admin"
     "Show user details"
     "Show user details"
   (let ((user (potato.db:load-instance 'potato.core:user user)))
+    (format t "ID: ~a~%" (potato.core:user/id user))
     (format t "Description: ~a~%" (potato.core:user/description user))
     (format t "Activated date: ~a~%" (potato.core:user/activated-p user))
     (format t "New login: ~:[false~;true~]~%" (potato.core:user/new-login user))
@@ -410,7 +424,71 @@ Valid values for role is: user, admin"
         (setf (potato.core:user/password user) "")
         (potato.core:user/update-password user password))
     (potato.db:save-instance user)
-    (format t "Password ~[updated~;cleared~]~%" clear)))
+    (format t "Password ~:[updated~;cleared~]~%" clear)))
+
+(define-command list-groups "list-groups"
+    ((domain "domain id"))
+    ()
+    "List groups in a domain"
+    "List groups in a domain "
+  (let ((domain (potato.db:load-instance 'potato.core:domain domain)))
+    (loop
+      for group in (potato.core:find-groups-in-domain domain)
+      do (format t "~a ~a~%" (potato.core:group/id group) (potato.core:group/name group)))))
+
+(define-command group-info "group-info"
+    ((group "group id"))
+    ()
+    "Show group info"
+    "Show group info"
+  (let ((group (potato.db:load-instance 'potato.core:group group)))
+    (format t "ID: ~a~%" (potato.core:group/id group))
+    (format t "Name: ~a~%" (potato.core:group/name group))
+    (format t "Type: ~a~%" (symbol-name (potato.core:group/type group)))
+    (format t "Email-domains: ~{~a~^, ~}~%" (potato.core:group/email-domains group))
+    (format t "Members:~%  ~{~s~^, ~}~%"
+            (mapcar (lambda (v)
+                      (let ((user (potato.core:load-user (getfield :|user_id| v))))
+                        (list (potato.core:user/id user)
+                              (potato.core:user/description user)
+                              (getfield :|role| v))))
+                    (potato.core:group/users group)))))
+
+(define-command set-user-group-role "set-user-group-role"
+    ((user "user id")
+     (group "group id")
+     (role "role"))
+    ()
+    "Set the role for a given user in a group"
+    "Set the role for a given user in a group. The role is one of: USER, ADMIN"
+  (let ((user (potato.core:load-user user))
+        (group (potato.db:load-instance 'potato.core:group group)))
+    (unless (member (potato.core:group/type group) '(:standard :domain-default))
+      (error "Can only change role for groups of type STANDARD or DOMAIN-DEFAULT"))
+    (unless (member role (list potato.core:+group-user-type-user+ potato.core:+group-user-type-admin+)
+                    :test #'equal)
+      (error "Illegal role type"))
+    (potato.core:update-role-for-group-user group user role)))
+
+(define-command create-views "create-views"
+    ()
+    ()
+    "Create views"
+    "Create the couchdb views. Each view is removed before being added again, in order
+to ensure that they are properly recreated."
+  (potato.views:init-views))
+
+(define-command test-email "test-email"
+    ((email "Email address"))
+    ((subject "Subject")
+     (text "Text content"))
+    "Send test email"
+    "Send a test email to the given address."
+  (potato.email:send-email (make-instance 'potato.email:mail-descriptor
+                                          :to-name email
+                                          :to-email email
+                                          :subject (or subject "Test mail")
+                                          :text-content (or text "Test mail"))))
 
 (defun run-command (cmd)
   (multiple-value-bind (match strings)
