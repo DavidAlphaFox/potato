@@ -4,9 +4,9 @@
   :license            {:name "Apache"}
   :min-lein-version   "2.8.1"
 
-  :dependencies [[org.clojure/clojure       "1.9.0"]
+  :dependencies [[org.clojure/clojure       "1.12.0"]
                  [http-kit                  "2.3.0-beta2"]
-                 [org.clojure/clojurescript "1.10.217" :scope "provided"]
+                 [org.clojure/clojurescript "1.12.42" :scope "provided"]
                  [org.omcljs/om             "1.0.0-beta1"]
                  [org.clojure/core.async    "0.4.474"]
                  ;; If cljs-http is upgraded to 0.1.39, the code will fail when compiled with optimisations enabled
@@ -26,7 +26,7 @@
                                                                   ring/ring-core
                                                                   commons-fileupload
                                                                   clj-time]]
-                             [cider/cider-nrepl "0.16.0" :exclusions [org.clojure/clojure
+                             [cider/cider-nrepl "0.55.7" :exclusions [org.clojure/clojure
                                                                       org.clojure/tools.nrepl]]]}}
 
   :cljsbuild {:builds
